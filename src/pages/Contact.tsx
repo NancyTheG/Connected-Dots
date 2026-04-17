@@ -7,12 +7,49 @@ export default function Contact() {
     name: '',
     email: '',
     service: 'Web Development',
-    message: ''
+    message: '',
+    _gotcha: '' // Honeypot field for bot protection
   });
 
-  const handleSubmit = (e: FormEvent) => {
+  const [state, setState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    alert('Thank you for your message! Our team will get back to you shortly.');
+    
+    // If honeypot is filled, assume its a bot
+    if (formData._gotcha) {
+      setState('success');
+      return;
+    }
+
+    setState('loading');
+
+    try {
+      const response = await fetch('https://formspree.io/f/mlgabopq', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          ...formData,
+          _subject: `New Lead: ${formData.name} - ${formData.service}`,
+          _replyto: formData.email // Ensures the 'Reply-To' header is set to the user's email
+        })
+      });
+
+      if (response.ok) {
+        setState('success');
+        setFormData({ name: '', email: '', service: 'Web Development', message: '' });
+      } else {
+        const errorData = await response.json();
+        console.error('Formspree Error:', errorData);
+        setState('error');
+      }
+    } catch (error) {
+      console.error('Submission Error:', error);
+      setState('error');
+    }
   };
 
   return (
@@ -91,63 +128,100 @@ export default function Contact() {
                 <p className="text-lg text-black/50 font-light">Fill out the form below and we'll connect within 24 hours.</p>
              </div>
 
-             <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Full Name</label>
-                    <input 
-                      type="text" 
-                      required
-                      placeholder="Sameer Sheikh"
-                      className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none"
-                      onChange={e => setFormData({...formData, name: e.target.value})}
-                    />
+             {state === 'success' ? (
+               <motion.div 
+                 initial={{ opacity: 0, scale: 0.9 }}
+                 animate={{ opacity: 1, scale: 1 }}
+                 className="bg-accent/10 border border-accent p-12 text-center"
+               >
+                 <h4 className="text-2xl font-black uppercase mb-4">Message Sent!</h4>
+                 <p className="text-black/60 mb-8 font-medium">Thank you for reaching out. Our team will get back to you shortly.</p>
+                 <button 
+                   onClick={() => setState('idle')}
+                   className="px-8 py-4 bg-accent text-black font-black text-[10px] uppercase tracking-widest"
+                 >
+                   Send Another Message
+                 </button>
+               </motion.div>
+             ) : (
+               <form 
+                 action="https://formspree.io/f/mlgabopq" 
+                 method="POST" 
+                 onSubmit={handleSubmit} 
+                 className="space-y-8"
+               >
+                  {/* Honeypot field for anti-spam bot protection */}
+                  <input type="text" name="_gotcha" className="hidden" style={{ display: 'none' }} placeholder="Ignore this field" onChange={e => setFormData({...formData, _gotcha: e.target.value})} />
+                  
+                  {state === 'error' && (
+                    <p className="text-red-500 font-bold text-xs uppercase tracking-widest">Something went wrong. Please try again.</p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Full Name</label>
+                      <input 
+                        type="text" 
+                        name="name"
+                        required
+                        value={formData.name}
+                        placeholder="Sameer Sheikh"
+                        className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none"
+                        onChange={e => setFormData({...formData, name: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Email Address</label>
+                      <input 
+                        type="email" 
+                        name="email"
+                        required
+                        value={formData.email}
+                        placeholder="hello@world.com"
+                        className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none"
+                        onChange={e => setFormData({...formData, email: e.target.value})}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Email Address</label>
-                    <input 
-                      type="email" 
-                      required
-                      placeholder="hello@world.com"
-                      className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none"
-                      onChange={e => setFormData({...formData, email: e.target.value})}
-                    />
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Services Needed</label>
-                  <select 
-                    className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none appearance-none"
-                    onChange={e => setFormData({...formData, service: e.target.value})}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Services Needed</label>
+                    <select 
+                      name="service"
+                      value={formData.service}
+                      className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none appearance-none"
+                      onChange={e => setFormData({...formData, service: e.target.value})}
+                    >
+                      <option>Web Development</option>
+                      <option>Graphic Design</option>
+                      <option>Branding</option>
+                      <option>Digital Marketing</option>
+                      <option>Google Ads / PPC</option>
+                      <option>App Development</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Your Message</label>
+                    <textarea 
+                      name="message"
+                      rows={6}
+                      required
+                      value={formData.message}
+                      placeholder="Briefly describe your vision..."
+                      className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none resize-none"
+                      onChange={e => setFormData({...formData, message: e.target.value})}
+                    ></textarea>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    disabled={state === 'loading'}
+                    className={`w-full py-6 bg-accent text-black font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] shadow-2xl ${state === 'loading' ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
-                    <option>Web Development</option>
-                    <option>Graphic Design</option>
-                    <option>Branding</option>
-                    <option>Digital Marketing</option>
-                    <option>Google Ads / PPC</option>
-                    <option>App Development</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-black/30">Your Message</label>
-                  <textarea 
-                    rows={6}
-                    required
-                    placeholder="Briefly describe your vision..."
-                    className="w-full px-6 py-4 bg-black/2 border border-black/10 transition-all focus:border-accent focus:bg-white text-black font-semibold outline-none resize-none"
-                    onChange={e => setFormData({...formData, message: e.target.value})}
-                  ></textarea>
-                </div>
-
-                <button 
-                  type="submit"
-                  className="w-full py-6 bg-accent text-black font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-transform hover:scale-[1.02] shadow-2xl"
-                >
-                  SEND ENQUIRY <Send size={16} />
-                </button>
-             </form>
+                    {state === 'loading' ? 'SENDING...' : 'SEND ENQUIRY'} <Send size={16} />
+                  </button>
+               </form>
+             )}
           </div>
         </div>
       </section>
